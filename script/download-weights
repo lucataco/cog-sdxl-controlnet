@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+# Run this before you deploy it on replicate
+import os
+import sys
+import torch
+from diffusers import ControlNetModel, DiffusionPipeline, AutoencoderKL
+
+# append project directory to path so predict.py can be imported
+sys.path.append('.')
+from predict import CONTROL_MODEL, VAE_MODEL, MODEL_NAME, CONTROL_CACHE, VAE_CACHE, MODEL_CACHE
+
+# Make cache folders
+if not os.path.exists(MODEL_CACHE):
+    os.makedirs(MODEL_CACHE)
+
+# SD-XL-Base-1.0 refiner
+controlnet = ControlNetModel.from_pretrained(
+    CONTROL_MODEL,
+    torch_dtype=torch.float16
+)
+controlnet.save_pretrained(CONTROL_CACHE)
+
+# # Download SDXL-VAE-FP16-Fix
+better_vae = AutoencoderKL.from_pretrained(
+    VAE_MODEL,
+    torch_dtype=torch.float16,
+)
+better_vae.save_pretrained(VAE_CACHE, safe_serialization=True)
+
+# SD-XL-Base-1.0
+pipe = DiffusionPipeline.from_pretrained(
+    MODEL_NAME,
+    vae=better_vae,
+    torch_dtype=torch.float16,
+    use_safetensors=True,
+    variant="fp16",
+)
+pipe.save_pretrained(MODEL_CACHE, safe_serialization=True)
