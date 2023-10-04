@@ -48,6 +48,30 @@ class Predictor(BasePredictor):
         shutil.copyfile(path, "/tmp/image.png")
         return load_image("/tmp/image.png").convert("RGB")
 
+    def resize_to_allowed_dimensions(self, width, height):
+        # List of SDXL dimensions
+        allowed_dimensions = [
+            (512, 2048), (512, 1984), (512, 1920), (512, 1856),
+            (576, 1792), (576, 1728), (576, 1664), (640, 1600),
+            (640, 1536), (704, 1472), (704, 1408), (704, 1344),
+            (768, 1344), (768, 1280), (832, 1216), (832, 1152),
+            (896, 1152), (896, 1088), (960, 1088), (960, 1024),
+            (1024, 1024), (1024, 960), (1088, 960), (1088, 896),
+            (1152, 896), (1152, 832), (1216, 832), (1280, 768),
+            (1344, 768), (1408, 704), (1472, 704), (1536, 640),
+            (1600, 640), (1664, 576), (1728, 576), (1792, 576),
+            (1856, 512), (1920, 512), (1984, 512), (2048, 512)
+        ]
+        # Calculate the aspect ratio
+        aspect_ratio = width / height
+        print(f"Aspect Ratio: {aspect_ratio:.2f}")
+        # Find the closest allowed dimensions that maintain the aspect ratio
+        closest_dimensions = min(
+            allowed_dimensions,
+            key=lambda dim: abs(dim[0] / dim[1] - aspect_ratio)
+        )
+        return closest_dimensions
+
     @torch.inference_mode()
     def predict(
         self,
@@ -82,9 +106,14 @@ class Predictor(BasePredictor):
         generator = torch.Generator("cuda").manual_seed(seed)
         print(f"Using seed: {seed}")
 
-        # self.pipe.enable_model_cpu_offload()
 
         image = self.load_image(image)
+        image_width, image_height = image.size
+        print("Original width:"+str(image_width)+", height:"+str(image_height))
+        new_width, new_height = self.resize_to_allowed_dimensions(image_width, image_height)
+        print("new_width:"+str(new_width)+", new_height:"+str(new_height))
+        image = image.resize((new_width, new_height))
+
         image = np.array(image)
         image = cv2.Canny(image, 100, 200)
         image = image[:, :, None]
